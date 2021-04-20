@@ -1,0 +1,475 @@
+---
+title: "Decision Trees"
+resource_files:
+- appforthat.jpg
+output:
+  xaringan::moon_reader:
+    css: xaringan-themer.css
+    lib_dir: libs
+    nature:
+      highlightLines: yes
+      highlightStyle: github
+      countIncrementalSlides: FALSE
+      ratio: '16:9'
+
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(tidymodels)
+library(flair)
+library(kknn)
+library(glmnet)
+library(here)
+library(rpart.plot)
+library(discrim)
+
+set.seed(98249)
+```
+
+```{r xaringan-themer, include=FALSE}
+library(xaringanthemer)
+library(xaringanExtra)
+style_mono_light(
+  base_color = "#26116c",
+  text_bold_color = "#fd5e53",
+  title_slide_text_color = "#fff8e7",
+  background_color = "#fff8e7",
+  header_font_google = google_font("Roboto"),
+  text_font_google   = google_font("Roboto Condensed"),
+  code_font_google   = google_font("Droid Mono")
+)
+```
+
+```{css, echo = FALSE}
+.red{ color: red; }
+.blue{ color: blue; }
+.huge {
+  font-size: 200%;
+}
+.large {
+  font-size: 150%;
+}
+.tiny {
+  font-size: 50%;
+}
+```
+
+class: center, middle, inverse
+
+# Decision Trees
+
+---
+
+# Setup
+
+```{r, include = FALSE, eval = FALSE}
+pot <- read_csv(here("Assignments", "data", "cannabis.csv"))
+
+unique_eff <- pot$Effects %>% str_split(",") %>% unlist() %>% unique()
+unique_flav <- pot$Flavor %>% str_split(",") %>% unlist() %>% unique()
+unique_all <- c(unique_eff, unique_flav) %>% str_subset("None", negate = TRUE) %>% .[!is.na(.)]
+
+
+make_col <- function(col_name) {
+  
+  as.integer(str_detect(pot$Effects, col_name) | str_detect(pot$Flavor, col_name))
+  
+}
+
+#make_col(pot, "Creative")
+
+tmp <- map_dfc(unique_all, make_col)
+names(tmp) = unique_all
+
+pot <- pot %>%
+  select(-Description) %>%
+  bind_cols(tmp)
+
+write_csv(pot, here("Assignments", "data", "cannabis_full.csv"))
+```
+
+Today's data concerns strains of cannabis, which have the types of `sativa`, `indica`, or `hybrid`:
+
+```{r, echo = FALSE, message = FALSE}
+
+cann <- read_csv("https://www.dropbox.com/s/s2a1uoiegitupjc/cannabis_full.csv?dl=1")
+
+head(cann)
+ 
+```
+
+---
+# Setup
+
+```{r}
+cann <- cann %>%
+  mutate(
+    Type = factor(Type)
+  ) %>%
+  drop_na()
+
+cann_cvs <- vfold_cv(cann, v = 5)
+
+cann_recipe <- recipe(Type ~ ., 
+                     data = cann) %>%
+  step_rm(Strain, Effects, Flavor)
+```
+---
+## Setup
+
+```{r}
+cann_recipe
+```
+
+---
+## Logistic Regression
+
+```{r, error = TRUE}
+logit_mod <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+logit_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(logit_mod)
+
+logit_fit <- logit_wflow %>%
+  fit_resamples(cann_cvs)
+
+```
+
+---
+## Logistic Regression
+
+**Problem 1:**  The model is trying to fit **65** predictor coefficients!  That's a LOT.
+
+--
+
+**Problem 2:** There are **three** categories in `Type`.  How do we interpret the log-odds for multiple groups?
+
+---
+## Discriminant Analysis
+
+```{r, error = TRUE}
+lda_mod <- discrim_linear() %>%
+  set_engine("MASS") %>%
+  set_mode("classification")
+
+lda_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(lda_mod)
+
+lda_fit <- lda_wflow %>%
+  fit_resamples(cann_cvs)
+
+```
+
+---
+## Discriminant Analysis
+
+**Problem:**  There are still **65** predictors, i.e., 65 dimensions!
+
+--
+
+Some of these contain duplicate information.
+
+--
+
+```{r, echo = FALSE}
+cann %>%
+  select(Dry, Mouth) %>%
+  arrange(desc(Dry))
+```
+
+
+---
+## KNN
+
+```{r, error = TRUE}
+knn_mod <- nearest_neighbor(neighbors = 5) %>%
+  set_engine("kknn") %>%
+  set_mode("classification")
+
+knn_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(knn_mod)
+
+knn_fit <- knn_wflow %>%
+  fit_resamples(cann_cvs)
+
+```
+
+---
+# KNN
+
+```{r}
+knn_fit <- knn_wflow %>%
+  fit_resamples(cann_cvs,
+                metrics = metric_set(accuracy, roc_auc, precision, recall))
+
+
+knn_fit %>% collect_metrics()
+```
+---
+class: center, middle
+background-image: url(https://thumbs.gfycat.com/KindMealyHare-size_restricted.gif)
+
+---
+class: center, middle
+
+# Decision Trees
+
+---
+## Let's play 20 questions.
+
+
+* Is this strain described as "Energetic"?
+
+```{r, echo = FALSE}
+cann %>%
+  ggplot(aes(x = factor(Energetic), fill = factor(Type))) +
+  geom_bar(position = "fill")
+```
+
+---
+## Let's play 20 questions.
+
+
+* Is this strain described as tasting like "Pineapple"?
+
+```{r, echo = FALSE}
+cann %>%
+  ggplot(aes(x = factor(Pineapple), fill = Type)) +
+  geom_bar(position = "fill")
+```
+
+---
+class: center, middle
+
+background-image: url(https://pbs.twimg.com/profile_images/1206579384762679299/hbixlO64_400x400.jpg)
+
+---
+
+background-image: url(akinator.jpg)
+
+
+---
+## Decision Trees
+
+```{r, error = TRUE}
+tree_mod <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+tree_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(tree_mod)
+```
+---
+## Decision Trees
+
+```{r}
+tree_fit <- tree_wflow %>%
+  fit_resamples(cann_cvs,
+                metrics = metric_set(accuracy, roc_auc, precision, recall))
+
+
+tree_fit %>% collect_metrics()
+```
+---
+
+class: center, middle
+
+background-image: url(https://i.gifer.com/xHj.gif)
+
+---
+## Decision Trees
+
+
+```{r, echo = FALSE}
+
+tree_fit_1 <- tree_wflow %>%
+  fit(cann)
+
+tree_fit_1$fit
+
+```
+---
+## Decision Trees
+
+```{r, echo = FALSE, warning = FALSE}
+tree_fitted <- tree_fit_1 %>% 
+  pull_workflow_fit()
+
+rpart.plot(tree_fitted$fit)
+```
+
+---
+## Decision Trees
+
+(code for that plot, requires `rpart.plot` package.)
+
+```{r, eval = FALSE}
+tree_fitted <- tree_fit_1 %>% 
+  pull_workflow_fit()
+
+rpart.plot(tree_fitted$fit)
+```
+
+---
+class: center, middle, inverse
+
+# What might we change?
+
+---
+# Decision Trees - Hyperparameters
+
+* `tree_depth`:  How many splits will we "allow" the tree to make?
+
+    + If we allowed infinite splits, we'd end up with only on observation in each "leaf".... **overfitting!**.
+    + If we allow only one split, our accuracy won't be that great.
+    + Default in `rpart`:  Up to **30**
+    
+--
+
+* `min_n`:  How many observations have to be in a "leaf" for us to be allowed to split it further?
+
+    + If `min_n` is too small, we're **overfitting**.
+    + If `min_n` is too big, we're not allowing enough **flexibility**.
+    + Default in `rpart`: **20**
+    
+---
+## Decision Trees - Hyperparameters
+
+Let's try varying `min_n` between 2 and 20.
+
+*Tuning with cross-validation takes a long time!  Do yourself a favor and start with a wide grid.*
+
+```{r}
+tree_grid <- grid_regular(min_n(c(2,20)), 
+                       levels = 4)
+
+tree_grid
+```
+    
+---
+## Decision Trees - Hyperparameters
+
+```{r, cache = TRUE}
+tree_mod <- decision_tree(min_n = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+tree_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(tree_mod)
+
+tree_grid_search <-
+  tune_grid(
+    tree_wflow,
+    resamples = cann_cvs,
+    grid = tree_grid
+  )
+
+tuning_metrics <- tree_grid_search %>% collect_metrics()
+```
+
+---
+## Decision Trees - Hyperparameters
+
+```{r}
+tuning_metrics
+```
+
+---
+
+class: center, middle
+
+background-image: url(https://media2.giphy.com/media/BJmTtZL4hova8/200.gif)
+
+---
+## What else can we change?
+
+How is `rpart` choosing to stop splitting?
+
+--
+
+* **cost complexity** = how much metric gain is "worth it" to do another split?
+
+    + Default:  Split must increase `accuracy` by at least 0.01.
+
+---
+## Cost complexity 
+
+
+```{r, cache = TRUE}
+tree_grid <- grid_regular(cost_complexity(),
+                          tree_depth(),
+                          min_n(), 
+                          levels = 2)
+
+tree_grid
+
+```
+
+---
+# Cost Complexity
+
+```{r, cache = TRUE}
+
+tree_mod <- decision_tree(cost_complexity = tune(),
+                          tree_depth = tune(),
+                          min_n = tune()) %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+tree_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(tree_mod)
+
+tree_grid_search <-
+  tune_grid(
+    tree_wflow,
+    resamples = cann_cvs,
+    grid = tree_grid
+  )
+
+tuning_metrics <- tree_grid_search %>% collect_metrics()
+```
+
+---
+# Tuning
+
+```{r}
+tuning_metrics
+```
+
+---
+# Tuning
+
+```{r}
+tuning_metrics %>%
+  filter(.metric == "accuracy") %>%
+  slice_max(mean)
+```
+
+```{r}
+tuning_metrics %>%
+  filter(.metric == "roc_auc") %>%
+  slice_max(mean)
+```
+
+---
+class: center, middle, inverse
+
+# Try it!
+
+## Open **Activity-Decision-Tree**
+#### Fit a final model with the selected hyperparameters
+#### Report some metrics for the final model
+#### Plot the tree (code is provided)
+#### Interpret the first two levels of splits in plain English.
+
+

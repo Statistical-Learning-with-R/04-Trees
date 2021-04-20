@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Decision Trees</title>
+    <meta charset="utf-8" />
+    <script src="libs/header-attrs-2.7/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Decision Trees
+
+---
+
+
+
+
+
+
+&lt;style type="text/css"&gt;
+.red{ color: red; }
+.blue{ color: blue; }
+.huge {
+  font-size: 200%;
+}
+.large {
+  font-size: 150%;
+}
+.tiny {
+  font-size: 50%;
+}
+&lt;/style&gt;
+
+class: center, middle, inverse
+
+# Decision Trees
+
+---
+
+# Setup
+
+
+
+Today's data concerns strains of cannabis, which have the types of `sativa`, `indica`, or `hybrid`:
+
+
+```
+## # A tibble: 6 x 69
+##   Strain  Type  Rating Effects Flavor Creative Energetic Tingly Euphoric Relaxed
+##   &lt;chr&gt;   &lt;chr&gt;  &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;     &lt;dbl&gt;     &lt;dbl&gt;  &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;
+## 1 100-Og  hybr~    4   Creati~ Earth~        1         1      1        1       1
+## 2 98-Whi~ hybr~    4.7 Relaxe~ Flowe~        1         1      0        0       1
+## 3 1024    sati~    4.4 Uplift~ Spicy~        1         1      0        0       1
+## 4 13-Daw~ hybr~    4.2 Tingly~ Apric~        1         0      1        0       1
+## 5 24K-Go~ hybr~    4.6 Happy,~ Citru~        0         0      0        1       1
+## 6 3-Bear~ indi~    0   None    None          0         0      0        0       0
+## # ... with 59 more variables: Aroused &lt;dbl&gt;, Happy &lt;dbl&gt;, Uplifted &lt;dbl&gt;,
+## #   Hungry &lt;dbl&gt;, Talkative &lt;dbl&gt;, Giggly &lt;dbl&gt;, Focused &lt;dbl&gt;, Sleepy &lt;dbl&gt;,
+## #   Dry &lt;dbl&gt;, Mouth &lt;dbl&gt;, Earthy &lt;dbl&gt;, Sweet &lt;dbl&gt;, Citrus &lt;dbl&gt;,
+## #   Flowery &lt;dbl&gt;, Violet &lt;dbl&gt;, Diesel &lt;dbl&gt;, Spicy/Herbal &lt;dbl&gt;, Sage &lt;dbl&gt;,
+## #   Woody &lt;dbl&gt;, Apricot &lt;dbl&gt;, Grapefruit &lt;dbl&gt;, Orange &lt;dbl&gt;, Pungent &lt;dbl&gt;,
+## #   Grape &lt;dbl&gt;, Pine &lt;dbl&gt;, Skunk &lt;dbl&gt;, Berry &lt;dbl&gt;, Pepper &lt;dbl&gt;,
+## #   Menthol &lt;dbl&gt;, Blue &lt;dbl&gt;, Cheese &lt;dbl&gt;, Chemical &lt;dbl&gt;, Mango &lt;dbl&gt;,
+## #   Lemon &lt;dbl&gt;, Peach &lt;dbl&gt;, Vanilla &lt;dbl&gt;, Nutty &lt;dbl&gt;, Chestnut &lt;dbl&gt;,
+## #   Tea &lt;dbl&gt;, Tobacco &lt;dbl&gt;, Tropical &lt;dbl&gt;, Strawberry &lt;dbl&gt;,
+## #   Blueberry &lt;dbl&gt;, Mint &lt;dbl&gt;, Apple &lt;dbl&gt;, Honey &lt;dbl&gt;, Lavender &lt;dbl&gt;,
+## #   Lime &lt;dbl&gt;, Coffee &lt;dbl&gt;, Ammonia &lt;dbl&gt;, Minty &lt;dbl&gt;, Tree &lt;dbl&gt;,
+## #   Fruit &lt;dbl&gt;, Butter &lt;dbl&gt;, Pineapple &lt;dbl&gt;, Tar &lt;dbl&gt;, Rose &lt;dbl&gt;,
+## #   Plum &lt;dbl&gt;, Pear &lt;dbl&gt;
+```
+
+---
+# Setup
+
+
+```r
+cann &lt;- cann %&gt;%
+  mutate(
+    Type = factor(Type)
+  ) %&gt;%
+  drop_na()
+
+cann_cvs &lt;- vfold_cv(cann, v = 5)
+
+cann_recipe &lt;- recipe(Type ~ ., 
+                     data = cann) %&gt;%
+  step_rm(Strain, Effects, Flavor)
+```
+---
+## Setup
+
+
+```r
+cann_recipe
+```
+
+```
+## Data Recipe
+## 
+## Inputs:
+## 
+##       role #variables
+##    outcome          1
+##  predictor         68
+## 
+## Operations:
+## 
+## Delete terms Strain, Effects, Flavor
+```
+
+---
+## Logistic Regression
+
+
+```r
+logit_mod &lt;- logistic_reg() %&gt;%
+  set_engine("glm") %&gt;%
+  set_mode("classification")
+
+logit_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(logit_mod)
+
+logit_fit &lt;- logit_wflow %&gt;%
+  fit_resamples(cann_cvs)
+```
+
+```
+## ! Fold1: model (predictions): prediction from a rank-deficient fit may be misleading
+```
+
+```
+## x Fold1: internal: Error: In metric: `roc_auc`
+```
+
+```
+## ! Fold2: model (predictions): prediction from a rank-deficient fit may be misleading
+```
+
+```
+## x Fold2: internal: Error: In metric: `roc_auc`
+```
+
+```
+## ! Fold3: model (predictions): prediction from a rank-deficient fit may be misleading
+```
+
+```
+## x Fold3: internal: Error: In metric: `roc_auc`
+```
+
+```
+## ! Fold4: model (predictions): prediction from a rank-deficient fit may be misleading
+```
+
+```
+## x Fold4: internal: Error: In metric: `roc_auc`
+```
+
+```
+## ! Fold5: model (predictions): prediction from a rank-deficient fit may be misleading
+```
+
+```
+## x Fold5: internal: Error: In metric: `roc_auc`
+```
+
+```
+## Warning: All models failed in [fit_resamples()]. See the `.notes` column.
+```
+
+---
+## Logistic Regression
+
+**Problem 1:**  The model is trying to fit **65** predictor coefficients!  That's a LOT.
+
+--
+
+**Problem 2:** There are **three** categories in `Type`.  How do we interpret the log-odds for multiple groups?
+
+---
+## Discriminant Analysis
+
+
+```r
+lda_mod &lt;- discrim_linear() %&gt;%
+  set_engine("MASS") %&gt;%
+  set_mode("classification")
+
+lda_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(lda_mod)
+
+lda_fit &lt;- lda_wflow %&gt;%
+  fit_resamples(cann_cvs)
+```
+
+```
+## ! Fold1: model: variables are collinear
+```
+
+```
+## x Fold2: model: Error in lda.default(x, grouping, ...): variables 15 16 appear to...
+```
+
+```
+## ! Fold3: model: variables are collinear
+```
+
+```
+## ! Fold4: model: variables are collinear
+```
+
+```
+## ! Fold5: model: variables are collinear
+```
+
+---
+## Discriminant Analysis
+
+**Problem:**  There are still **65** predictors, i.e., 65 dimensions!
+
+--
+
+Some of these contain duplicate information.
+
+--
+
+
+```
+## # A tibble: 2,305 x 2
+##      Dry Mouth
+##    &lt;dbl&gt; &lt;dbl&gt;
+##  1     1     1
+##  2     0     0
+##  3     0     0
+##  4     0     0
+##  5     0     0
+##  6     0     0
+##  7     0     0
+##  8     0     0
+##  9     0     0
+## 10     0     0
+## # ... with 2,295 more rows
+```
+
+
+---
+## KNN
+
+
+```r
+knn_mod &lt;- nearest_neighbor(neighbors = 5) %&gt;%
+  set_engine("kknn") %&gt;%
+  set_mode("classification")
+
+knn_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(knn_mod)
+
+knn_fit &lt;- knn_wflow %&gt;%
+  fit_resamples(cann_cvs)
+```
+
+---
+# KNN
+
+
+```r
+knn_fit &lt;- knn_wflow %&gt;%
+  fit_resamples(cann_cvs,
+                metrics = metric_set(accuracy, roc_auc, precision, recall))
+
+
+knn_fit %&gt;% collect_metrics()
+```
+
+```
+## # A tibble: 4 x 5
+##   .metric   .estimator  mean     n std_err
+##   &lt;chr&gt;     &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;
+## 1 accuracy  multiclass 0.486     5 0.00908
+## 2 precision macro      0.453     5 0.0111 
+## 3 recall    macro      0.455     5 0.0113 
+## 4 roc_auc   hand_till  0.668     5 0.00600
+```
+---
+class: center, middle
+background-image: url(https://thumbs.gfycat.com/KindMealyHare-size_restricted.gif)
+
+---
+class: center, middle
+
+# Decision Trees
+
+---
+## Let's play 20 questions.
+
+
+* Is this strain described as "Energetic"?
+
+![](Decision-Trees_files/figure-html/unnamed-chunk-11-1.png)&lt;!-- --&gt;
+
+---
+## Let's play 20 questions.
+
+
+* Is this strain described as tasting like "Pineapple"?
+
+![](Decision-Trees_files/figure-html/unnamed-chunk-12-1.png)&lt;!-- --&gt;
+
+---
+class: center, middle
+
+background-image: url(https://pbs.twimg.com/profile_images/1206579384762679299/hbixlO64_400x400.jpg)
+
+---
+
+background-image: url(akinator.jpg)
+
+
+---
+## Decision Trees
+
+
+```r
+tree_mod &lt;- decision_tree() %&gt;%
+  set_engine("rpart") %&gt;%
+  set_mode("classification")
+
+tree_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(tree_mod)
+```
+---
+## Decision Trees
+
+
+```r
+tree_fit &lt;- tree_wflow %&gt;%
+  fit_resamples(cann_cvs,
+                metrics = metric_set(accuracy, roc_auc, precision, recall))
+
+
+tree_fit %&gt;% collect_metrics()
+```
+
+```
+## # A tibble: 4 x 5
+##   .metric   .estimator  mean     n std_err
+##   &lt;chr&gt;     &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;
+## 1 accuracy  multiclass 0.623     5 0.00797
+## 2 precision macro      0.597     5 0.00957
+## 3 recall    macro      0.572     5 0.0110 
+## 4 roc_auc   hand_till  0.750     5 0.00631
+```
+---
+
+class: center, middle
+
+background-image: url(https://i.gifer.com/xHj.gif)
+
+---
+## Decision Trees
+
+
+
+```
+## $actions
+## $actions$model
+## $spec
+## Decision Tree Model Specification (classification)
+## 
+## Computational engine: rpart 
+## 
+## 
+## $formula
+## NULL
+## 
+## attr(,"class")
+## [1] "action_model" "action_fit"   "action"      
+## 
+## 
+## $fit
+## parsnip model object
+## 
+## Fit time:  311ms 
+## n= 2305 
+## 
+## node), split, n, loss, yval, (yprob)
+##       * denotes terminal node
+## 
+##  1) root 2305 1118 hybrid (0.51496746 0.29804772 0.18698482)  
+##    2) Sleepy&lt; 0.5 1580  629 hybrid (0.60189873 0.14303797 0.25506329)  
+##      4) Energetic&lt; 0.5 981  344 hybrid (0.64933741 0.20591233 0.14475025) *
+##      5) Energetic&gt;=0.5 599  285 hybrid (0.52420701 0.04006678 0.43572621)  
+##       10) Relaxed&gt;=0.5 281  104 hybrid (0.62989324 0.04982206 0.32028470) *
+##       11) Relaxed&lt; 0.5 318  147 sativa (0.43081761 0.03144654 0.53773585) *
+##    3) Sleepy&gt;=0.5 725  264 indica (0.32551724 0.63586207 0.03862069) *
+## 
+## attr(,"class")
+## [1] "stage_fit" "stage"
+```
+---
+## Decision Trees
+
+![](Decision-Trees_files/figure-html/unnamed-chunk-16-1.png)&lt;!-- --&gt;
+
+---
+## Decision Trees
+
+(code for that plot, requires `rpart.plot` package.)
+
+
+```r
+tree_fitted &lt;- tree_fit_1 %&gt;% 
+  pull_workflow_fit()
+
+rpart.plot(tree_fitted$fit)
+```
+
+---
+class: center, middle, inverse
+
+# What might we change?
+
+---
+# Decision Trees - Hyperparameters
+
+* `tree_depth`:  How many splits will we "allow" the tree to make?
+
+    + If we allowed infinite splits, we'd end up with only on observation in each "leaf".... **overfitting!**.
+    + If we allow only one split, our accuracy won't be that great.
+    + Default in `rpart`:  Up to **30**
+    
+--
+
+* `min_n`:  How many observations have to be in a "leaf" for us to be allowed to split it further?
+
+    + If `min_n` is too small, we're **overfitting**.
+    + If `min_n` is too big, we're not allowing enough **flexibility**.
+    + Default in `rpart`: **20**
+    
+---
+## Decision Trees - Hyperparameters
+
+Let's try varying `min_n` between 2 and 20.
+
+*Tuning with cross-validation takes a long time!  Do yourself a favor and start with a wide grid.*
+
+
+```r
+tree_grid &lt;- grid_regular(min_n(c(2,20)), 
+                       levels = 4)
+
+tree_grid
+```
+
+```
+## # A tibble: 4 x 1
+##   min_n
+##   &lt;int&gt;
+## 1     2
+## 2     8
+## 3    14
+## 4    20
+```
+    
+---
+## Decision Trees - Hyperparameters
+
+
+```r
+tree_mod &lt;- decision_tree(min_n = tune()) %&gt;%
+  set_engine("rpart") %&gt;%
+  set_mode("classification")
+
+tree_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(tree_mod)
+
+tree_grid_search &lt;-
+  tune_grid(
+    tree_wflow,
+    resamples = cann_cvs,
+    grid = tree_grid
+  )
+
+tuning_metrics &lt;- tree_grid_search %&gt;% collect_metrics()
+```
+
+---
+## Decision Trees - Hyperparameters
+
+
+```r
+tuning_metrics
+```
+
+```
+## # A tibble: 8 x 7
+##   min_n .metric  .estimator  mean     n std_err .config
+##   &lt;int&gt; &lt;chr&gt;    &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;  
+## 1     2 accuracy multiclass 0.623     5 0.00797 Model1 
+## 2     2 roc_auc  hand_till  0.750     5 0.00631 Model1 
+## 3     8 accuracy multiclass 0.623     5 0.00797 Model2 
+## 4     8 roc_auc  hand_till  0.750     5 0.00631 Model2 
+## 5    14 accuracy multiclass 0.623     5 0.00797 Model3 
+## 6    14 roc_auc  hand_till  0.750     5 0.00631 Model3 
+## 7    20 accuracy multiclass 0.623     5 0.00797 Model4 
+## 8    20 roc_auc  hand_till  0.750     5 0.00631 Model4
+```
+
+---
+
+class: center, middle
+
+background-image: url(https://media2.giphy.com/media/BJmTtZL4hova8/200.gif)
+
+---
+## What else can we change?
+
+How is `rpart` choosing to stop splitting?
+
+--
+
+* **cost complexity** = how much metric gain is "worth it" to do another split?
+
+    + Default:  Split must increase `accuracy` by at least 0.01.
+
+---
+## Cost complexity 
+
+
+
+```r
+tree_grid &lt;- grid_regular(cost_complexity(),
+                          tree_depth(),
+                          min_n(), 
+                          levels = 2)
+
+tree_grid
+```
+
+```
+## # A tibble: 8 x 3
+##   cost_complexity tree_depth min_n
+##             &lt;dbl&gt;      &lt;int&gt; &lt;int&gt;
+## 1    0.0000000001          1     2
+## 2    0.1                   1     2
+## 3    0.0000000001         15     2
+## 4    0.1                  15     2
+## 5    0.0000000001          1    40
+## 6    0.1                   1    40
+## 7    0.0000000001         15    40
+## 8    0.1                  15    40
+```
+
+---
+# Cost Complexity
+
+
+```r
+tree_mod &lt;- decision_tree(cost_complexity = tune(),
+                          tree_depth = tune(),
+                          min_n = tune()) %&gt;%
+  set_engine("rpart") %&gt;%
+  set_mode("classification")
+
+tree_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(tree_mod)
+
+tree_grid_search &lt;-
+  tune_grid(
+    tree_wflow,
+    resamples = cann_cvs,
+    grid = tree_grid
+  )
+
+tuning_metrics &lt;- tree_grid_search %&gt;% collect_metrics()
+```
+
+---
+# Tuning
+
+
+```r
+tuning_metrics
+```
+
+```
+## # A tibble: 16 x 9
+##    cost_complexity tree_depth min_n .metric  .estimator  mean     n std_err
+##              &lt;dbl&gt;      &lt;int&gt; &lt;int&gt; &lt;chr&gt;    &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;
+##  1    0.0000000001          1     2 accuracy multiclass 0.613     5 0.0122 
+##  2    0.0000000001          1     2 roc_auc  hand_till  0.680     5 0.0103 
+##  3    0.1                   1     2 accuracy multiclass 0.613     5 0.0122 
+##  4    0.1                   1     2 roc_auc  hand_till  0.680     5 0.0103 
+##  5    0.0000000001         15     2 accuracy multiclass 0.546     5 0.00805
+##  6    0.0000000001         15     2 roc_auc  hand_till  0.638     5 0.0160 
+##  7    0.1                  15     2 accuracy multiclass 0.613     5 0.0122 
+##  8    0.1                  15     2 roc_auc  hand_till  0.680     5 0.0103 
+##  9    0.0000000001          1    40 accuracy multiclass 0.613     5 0.0122 
+## 10    0.0000000001          1    40 roc_auc  hand_till  0.680     5 0.0103 
+## 11    0.1                   1    40 accuracy multiclass 0.613     5 0.0122 
+## 12    0.1                   1    40 roc_auc  hand_till  0.680     5 0.0103 
+## 13    0.0000000001         15    40 accuracy multiclass 0.588     5 0.0130 
+## 14    0.0000000001         15    40 roc_auc  hand_till  0.753     5 0.0129 
+## 15    0.1                  15    40 accuracy multiclass 0.613     5 0.0122 
+## 16    0.1                  15    40 roc_auc  hand_till  0.680     5 0.0103 
+## # ... with 1 more variable: .config &lt;chr&gt;
+```
+
+---
+# Tuning
+
+
+```r
+tuning_metrics %&gt;%
+  filter(.metric == "accuracy") %&gt;%
+  slice_max(mean)
+```
+
+```
+## # A tibble: 6 x 9
+##   cost_complexity tree_depth min_n .metric  .estimator  mean     n std_err
+##             &lt;dbl&gt;      &lt;int&gt; &lt;int&gt; &lt;chr&gt;    &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;
+## 1    0.0000000001          1     2 accuracy multiclass 0.613     5  0.0122
+## 2    0.1                   1     2 accuracy multiclass 0.613     5  0.0122
+## 3    0.1                  15     2 accuracy multiclass 0.613     5  0.0122
+## 4    0.0000000001          1    40 accuracy multiclass 0.613     5  0.0122
+## 5    0.1                   1    40 accuracy multiclass 0.613     5  0.0122
+## 6    0.1                  15    40 accuracy multiclass 0.613     5  0.0122
+## # ... with 1 more variable: .config &lt;chr&gt;
+```
+
+
+```r
+tuning_metrics %&gt;%
+  filter(.metric == "roc_auc") %&gt;%
+  slice_max(mean)
+```
+
+```
+## # A tibble: 1 x 9
+##   cost_complexity tree_depth min_n .metric .estimator  mean     n std_err
+##             &lt;dbl&gt;      &lt;int&gt; &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt;
+## 1    0.0000000001         15    40 roc_auc hand_till  0.753     5  0.0129
+## # ... with 1 more variable: .config &lt;chr&gt;
+```
+
+---
+class: center, middle, inverse
+
+# Try it!
+
+## Open **Activity-Decision-Tree**
+#### Fit a final model with the selected hyperparameters
+#### Report some metrics for the final model
+#### Plot the tree (code is provided)
+#### Interpret the first two levels of splits in plain English.
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightLines": true,
+"highlightStyle": "github",
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

@@ -1,0 +1,472 @@
+---
+title: "FAQ/Review"
+output:
+  xaringan::moon_reader:
+    css: xaringan-themer.css
+    lib_dir: libs
+    nature:
+      highlightLines: yes
+      highlightStyle: github
+      countIncrementalSlides: FALSE
+      ratio: '16:9'
+
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(flair)
+library(kknn)
+library(glmnet)
+```
+
+```{r xaringan-themer, include=FALSE}
+library(xaringanthemer)
+library(xaringanExtra)
+style_mono_light(
+  base_color = "#26116c",
+  text_bold_color = "#fd5e53",
+  title_slide_text_color = "#fff8e7",
+  background_color = "#fff8e7",
+  header_font_google = google_font("Roboto"),
+  text_font_google   = google_font("Roboto Condensed"),
+  code_font_google   = google_font("Droid Mono")
+)
+```
+
+```{css, echo = FALSE}
+.red{ color: red; }
+.blue{ color: blue; }
+.huge {
+  font-size: 200%;
+}
+.large {
+  font-size: 150%;
+}
+.tiny {
+  font-size: 50%;
+}
+```
+
+---
+class: center, middle
+
+# FAQ
+
+---
+class: center, middle, inverse
+
+# Do we have to cross-validate to get metrics on the final model?
+
+---
+# Do we have to cross-validate to get metrics on the final model?
+
+--
+
+## YES!!!!
+
+--
+
+Remember the cautionary tale of **overfitting**.
+
+Once we select our final **hyperparameters** and final **predictors**, we fit our final model on the **full data**.  (No data should be wasted!)
+
+--
+
+But we want to report the quality of this model in terms of how we think it will perform on **future data**.
+
+To get a **fair** estimate of the metrics, we need to **cross-validate**.
+
+---
+class: center, middle, inverse
+
+# Why do we bother fitting a final model?
+
+---
+# Why do we bother fitting a final model?
+
+
+If we are doing **inference:**  
+
+Because we would like to use **all** the data on hand to get our final statistical estimates (e.g., the **coefficients**)
+
+--
+
+
+If we are doing **prediction:**
+
+Because we want to prepare to predict on **future observations**.
+
+We would like to use **all** the data on hand to **train** the model that we will use in the future
+
+---
+class: center, middle, inverse
+
+# Which metric is the best one?
+
+---
+# Which metric is the best one?
+
+
+**Regression:** While there is no "objective" right answer, the **MSE** and the **R-squared** are popular choices.
+
+--
+
+**Classification:**  This depends very much on **context**.
+
+* How bad is it if we predict A, and the truth is B?
+* How bad is it if we predict B, and the truth is A?
+
+---
+class: center, middle, inverse
+
+# How do I compute individual metrics?
+
+---
+class: center, middle
+
+![](https://media0.giphy.com/media/mCClSS6xbi8us/200.gif)
+
+---
+# How do I compute individual metrics?
+
+The **only** time it makes sense to report non-cross-validated metrics is if you have **new data** (or a "validation set").
+
+--
+
+Each metric has its own function, e.g. `roc_auc()`.
+
+This function requires:  
+
+1. The dataset
+2. The true classes
+3. Either the **predicted classes** or the **predicted probabilities of Class 1**
+
+--
+
+(What is Class 1?  The "first" one in the factor, usually alphabetical.)
+
+---
+# How do I compute individual metrics on a validation set?
+
+```{r, echo = FALSE, include = FALSE}
+ins <- read_csv("https://www.dropbox.com/s/bocjjyo1ehr5auz/insurance.csv?dl=1")
+
+ins <- ins %>%
+  mutate(
+    smoker = factor(smoker)
+  ) %>%
+  drop_na()
+
+
+ins_new <- read_csv("https://www.dropbox.com/s/sky86agc4s8c6qe/insurance_costs_2.csv?dl=1")
+
+ins_new <- ins_new %>%
+  mutate(
+    smoker = factor(smoker)
+  ) %>%
+  drop_na()
+```
+
+```{r}
+logit_mod <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+
+ins_recipe <- recipe(smoker ~ charges, 
+                     data = ins)
+
+logit_wflow <- workflow() %>%
+  add_recipe(ins_recipe) %>%
+  add_model(logit_mod)
+
+logit_fit <- logit_wflow %>%
+  fit(ins_new)
+
+```
+
+---
+# How do I compute individual metrics on a validation set?
+
+```{r}
+predict_classes <- predict(logit_fit, ins_new)
+predict_probs <- predict(logit_fit, ins_new,
+                         type = "prob")
+
+ins_new <- ins_new %>%
+  mutate(
+    smoker_predicted = predict_classes$.pred_class,
+    smoker_prob_no = predict_probs$.pred_no,
+    smoker_prob_yes = predict_probs$.pred_yes
+  )
+
+```
+
+---
+
+```{r, echo = FALSE}
+ins_new %>% select(smoker, smoker_predicted, smoker_prob_no, smoker_prob_yes) 
+```
+
+---
+# How do I compute individual metrics on a validation set?
+
+```{r}
+
+ins_new %>%
+  accuracy(truth = smoker,
+           estimate = smoker_predicted)
+ins_new %>%
+  roc_auc(truth = smoker, 
+          smoker_prob_no)
+
+ins_new %>%
+  roc_auc(truth = smoker, 
+          smoker_prob_yes,
+          event_level = "second")
+
+```
+
+---
+class: center, middle, inverse
+
+# What's the deal with ROC anyways?
+
+---
+# What's the deal with ROC anyways?
+
+Our model predictions give us the **probability** of each observation belonging to each category.
+
+--
+
+By default, we'll predict that each observation belongs to the category with the highest probability.
+
+(i.e., in this case, the cutoff is 0.5)
+
+---
+# What's the deal with ROC anyways?
+
+```{r}
+ins_new <- ins_new %>%
+  mutate(
+    cutoff_50 = ifelse(smoker_prob_yes > 0.5, "yes", "no"),
+    cutoff_50 = factor(cutoff_50)
+  )
+```
+
+---
+
+```{r, echo = FALSE}
+ins_new %>% select(smoker, smoker_predicted, cutoff_50, smoker_prob_no, smoker_prob_yes)
+
+```
+---
+# What's the deal with ROC anyways?
+
+
+```{r}
+ins_new %>%
+  sensitivity(truth = smoker,
+           estimate = smoker_predicted)
+
+ins_new %>%
+  specificity(truth = smoker,
+           estimate = smoker_predicted)
+
+ins_new %>%
+  sensitivity(truth = smoker,
+           estimate = cutoff_50)
+
+ins_new %>%
+  specificity(truth = smoker,
+           estimate = cutoff_50)
+```
+
+---
+# What's the deal with ROC anyways?
+
+But what if we used a different number as our cutoff?
+
+For example, maybe we really want to prioritize **specificity**: that is, we want to make sure that if we say someone is a smoker, they really are.
+
+--
+
+```{r}
+ins_new <- ins_new %>%
+  mutate(
+    cutoff_75 = ifelse(smoker_prob_yes > 0.75, "yes", "no"),
+    cutoff_75 = factor(cutoff_75)
+  )
+```
+
+---
+
+```{r, echo = FALSE}
+ins_new %>% select(smoker, smoker_predicted, cutoff_50, smoker_prob_no, smoker_prob_yes)
+```
+---
+# What's the deal with ROC anyways?
+
+
+```{r}
+ins_new %>%
+  sensitivity(truth = smoker,
+           estimate = smoker_predicted)
+
+ins_new %>%
+  specificity(truth = smoker,
+           estimate = smoker_predicted)
+
+ins_new %>%
+  sensitivity(truth = smoker,
+           estimate = cutoff_75)
+
+ins_new %>%
+  specificity(truth = smoker,
+           estimate = cutoff_75)
+```
+
+---
+# What's the deal with ROC anyways?
+
+Now, imagine if we did that for all possible cutoffs between 0 and 1.
+
+For each cutoff, we'd have a **sensitivity** and **specificity** pair.
+
+--
+
+Let's plot those pairs!
+
+```{r, eval = FALSE}
+
+ins_new %>%
+  roc_curve(truth = smoker, 
+          smoker_prob_yes,
+          event_level = "second")
+```
+
+---
+# What's the deal with ROC anyways?
+
+```{r, echo = FALSE}
+
+ins_new %>%
+  roc_curve(truth = smoker, 
+          smoker_prob_yes,
+          event_level = "second") %>%
+  autoplot()
+```
+
+---
+# What's the deal with ROC anyways?
+
+A good classifie* can achieve **high specificity** *and* **high sensitivity**.
+
+--
+
+A good classifier doesn't **change its answers** too much when the cutoff changes.
+
+--
+
+If your probabilities are close to 0 or 1, that's good.
+
+If your probabilities are close to 0.5, you're just guessing.
+
+---
+class: center, middle
+
+![](https://i.pinimg.com/originals/74/8a/45/748a45314279131390065fc44cc57960.gif)
+
+---
+class: center, middle, inverse
+
+# How the heck do we know which models to try?
+
+---
+
+class: center, middle
+
+![](https://media2.giphy.com/media/deLPEITdVodVe/200.gif)
+
+---
+
+class: center, middle
+
+![](https://media1.giphy.com/media/VuW0mhX8r4DmBUkZ9w/source.gif)
+
+---
+# Some ideas...
+
+
+* **Plot** your potential predictors against your response variable.  Start by using just the ones that appear to have some association.
+
+--
+
+* **Backwards selection:** Begin with all your predictors in the model, and drop one at a time to see if the model improves.
+
+--
+
+* **Forwards selection:** Begin with just one predictor in the model, and add in one at a time to see if the model improves. (*I like this one, personally*)
+
+--
+
+* **Every subset selection:** Try every possible combination of predictors that exists.  Yikes.
+
+---
+
+# Regarding Pre-Processing
+
+You *can* just guess-and-check to see which transformations help...
+
+--
+
+... but ideally, you'd choose your pre-processing for a reason.
+
+--
+
+In KNN, we usually **normalize** everything, so that the predictors are on the same **scale**.
+
+--
+
+In regression, we often do **log transformations** or **square root transformation** of data that is **skewed**, to match the **model assumptions**.
+
+--
+
+Maybe you have some **domain knowledge** of the data, that leads you to a certain choice of pre-processing.
+
+
+---
+
+class: center, middle, inverse
+
+# From now on...
+
+![](https://i.pinimg.com/originals/5a/9a/08/5a9a08fe4d4fccc070170f2238dfbe37.gif)
+
+---
+# From now on:
+
+* If I say **fit a classification model**, it is up to you to decide which model types (KNN, Logistic, etc) to try.
+
+--
+
+* If I say **choose the best model**, it is up to you to decide which metric you are using and justify it.
+
+--
+
+* If I do not explicitly say to **consider variable transformations**, you should still consider variable transformations.
+
+--
+
+* If I say **report your final model**, you should also report relevant, cross-validated metrics.
+
+
+---
+class: center, middle, inverse
+
+# Final Advice:
+
+![](https://media1.tenor.com/images/6f017ea3e505c0de7e84a8505972ec5d/tenor.gif?itemid=9502336)
+
+(skip the math!)
+
