@@ -245,48 +245,6 @@ tree_2 <- tree_wflow %>%
 
 How similar will the results be?
 
-<!--
-
----
-## Tree variability
-
-LDA:
-
-```{r, echo = FALSE}
-lda_1 %>%
-  pull_workflow_fit() %$%
- fit %$% scaling %>%
-  data.frame() %>%
-  rownames_to_column("word") %>%
-  top_n(10, abs(LD1))  %>%
-  mutate(
-    word = fct_reorder(word, LD1)
-  ) %>%
-  ggplot(aes(x = word, y = LD1)) +
-  geom_col()
-```
-
-
-
----
-## Tree variability
-
-LDA 2:
-
-```{r, echo = FALSE}
-lda_2 %>%
-  pull_workflow_fit() %$%
- fit %$% scaling %>%
-  data.frame() %>%
-  rownames_to_column("word") %>%
-  top_n(10, abs(LD1)) %>%
-  mutate(
-    word = fct_reorder(word, LD1)
-  ) %>%
-  ggplot(aes(x = word, y = LD1)) +
-  geom_col()
-```
--->
 ---
 ## Tree variability
 
@@ -341,14 +299,14 @@ This is called **bagging**
 library(baguette)
 
 bag_tree_spec <- bag_tree() %>%
-  set_engine("rpart", times = 5) %>%
+  set_engine("rpart", times = 3) %>%
   set_mode("classification")
 
 ```
 
 ```{r, echo = FALSE}
 decorate("baguette") %>%
-  flair("times = 5")
+  flair("times = 3")
 ```
 
 ---
@@ -435,6 +393,10 @@ The advantage of this is that more unique variables are involved in the process.
 --
 
 This way, we don't accidentally overfit to a variable that *happens* to be extremely relevant to our particular dataset.
+
+--
+
+Model spec: `rand_forest()`
 
 ---
 class: center, middle
