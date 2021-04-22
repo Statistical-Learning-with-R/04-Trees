@@ -1,0 +1,453 @@
+---
+title: "Decision Trees: Next Level"
+resource_files:
+- appforthat.jpg
+output:
+  xaringan::moon_reader:
+    css: xaringan-themer.css
+    lib_dir: libs
+    nature:
+      highlightLines: yes
+      highlightStyle: github
+      countIncrementalSlides: FALSE
+      ratio: '16:9'
+
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(tidymodels)
+library(flair)
+library(kknn)
+library(glmnet)
+library(here)
+library(rpart.plot)
+library(discrim)
+
+set.seed(98249)
+```
+
+```{r xaringan-themer, include=FALSE}
+library(xaringanthemer)
+library(xaringanExtra)
+style_mono_light(
+  base_color = "#26116c",
+  text_bold_color = "#fd5e53",
+  title_slide_text_color = "#fff8e7",
+  background_color = "#fff8e7",
+  header_font_google = google_font("Roboto"),
+  text_font_google   = google_font("Roboto Condensed"),
+  code_font_google   = google_font("Droid Mono")
+)
+```
+
+```{css, echo = FALSE}
+.red{ color: red; }
+.blue{ color: blue; }
+.huge {
+  font-size: 200%;
+}
+.large {
+  font-size: 150%;
+}
+.tiny {
+  font-size: 50%;
+}
+```
+---
+class: center, middle, inverse
+
+# Measuring Success
+## Gini Index and Cost Complexity
+
+---
+## Recall: Our simplest cannabis tree
+
+.pull-left[
+* Which of the **final nodes** (or **leaves**) is **most pure**?
+
+* Which is **least pure**?
+
+--
+
+* Could we split a node further for better purity?
+
+* **almost certainly, yes!** It's highly unlikely that *all* of the unused variable have *exactly* the same prevalance across categories.
+
+--
+
+* Should we do it, or is that overfitting?
+]
+
+.pull-right[
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+cann <- read_csv("https://www.dropbox.com/s/s2a1uoiegitupjc/cannabis_full.csv?dl=1")
+
+
+cann <- cann %>%
+  mutate(
+    Type = factor(Type)
+  ) %>%
+  rename(
+    Spicy = `Spicy/Herbal`
+  ) %>%
+  drop_na()
+
+cann_cvs <- vfold_cv(cann, v = 5)
+
+cann_recipe <- recipe(Type ~ ., 
+                     data = cann) %>%
+  step_rm(Strain, Effects, Flavor, Dry, Mouth)
+
+tree_mod <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+lda_mod <- discrim_linear() %>%
+  set_engine("MASS") %>%
+  set_mode("classification")
+
+tree_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(tree_mod)
+
+
+lda_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(lda_mod)
+
+
+tree_fit_1 <- tree_wflow %>%
+  fit(cann)
+
+
+tree_fitted <- tree_fit_1 %>% 
+  pull_workflow_fit()
+
+rpart.plot(tree_fitted$fit)
+```
+]
+
+---
+## Cost Complexity revisted
+
+.pull-left[
+
+* What is the **classification error** of each leaf?
+
+--
+
+* (Left to right)
+
+    + 0.35
+    + 0.37
+    + 0.46
+    + 0.36
+    
+--
+
+* The **Gini Index** for a particular node is the average of errors in each class:
+
+$(0.35*0.65) + (0.21*0.79) + (0.14*0.86) = 0.5138$
+
+    + small values if the classification errors are close to 0, i.e., high node purity
+    + large values (near 1) if the errors are high
+    + this is related to the *variance* of the node
+
+]
+
+.pull-right[
+```{r}
+rpart.plot(tree_fitted$fit)
+```
+]
+
+---
+
+## Gini Index
+
+To calculate the Gini Index average across all leaves:
+
+```{r}
+cann %>%
+  bind_cols(
+    predict(tree_fitted, cann, type = "prob")
+  ) %>%
+  gain_capture(truth = Type,
+               .pred_hybrid, .pred_indica, .pred_sativa)
+```
+
+---
+
+## Cost Complexity revisited
+
+So, when should we split the tree further?
+
+--
+
+Only if the new splits improve the Gini Index by a certain amount.
+
+--
+
+This is the `cost_complexity` parameter!
+
+-- 
+
+But wait!  This is a **penalized** metric, using an arbitrary penalty $\alpha$ to avoid overfitting.
+
+Don't we like cross-validation better?
+
+--
+
+Well... yes.
+
+But imagine fitting *every possible tree* and cross-validating.... yikes.
+
+We have to limit our options and cut our losses somehow!
+
+---
+class: center, middle, inverse
+
+# Bagging
+
+---
+## Tree variability
+
+Suppose I took two random subsamples of my cannabis dataset:
+
+```{r}
+set.seed(9374534)
+splits <- cann %>% 
+  initial_split(0.5, strata = Type)
+
+cann_1 <- splits %>% training()
+cann_2 <- splits %>% testing()
+
+dim(cann_1)
+dim(cann_2)
+```
+
+---
+## Tree variability
+
+Then I fit a **decision tree** to each:
+
+```{r}
+tree_1 <- tree_wflow %>%
+  fit(cann_1)
+
+tree_2 <- tree_wflow %>%
+  fit(cann_2)
+```
+
+How similar will the results be?
+
+<!--
+
+---
+## Tree variability
+
+LDA:
+
+```{r, echo = FALSE}
+lda_1 %>%
+  pull_workflow_fit() %$%
+ fit %$% scaling %>%
+  data.frame() %>%
+  rownames_to_column("word") %>%
+  top_n(10, abs(LD1))  %>%
+  mutate(
+    word = fct_reorder(word, LD1)
+  ) %>%
+  ggplot(aes(x = word, y = LD1)) +
+  geom_col()
+```
+
+
+
+---
+## Tree variability
+
+LDA 2:
+
+```{r, echo = FALSE}
+lda_2 %>%
+  pull_workflow_fit() %$%
+ fit %$% scaling %>%
+  data.frame() %>%
+  rownames_to_column("word") %>%
+  top_n(10, abs(LD1)) %>%
+  mutate(
+    word = fct_reorder(word, LD1)
+  ) %>%
+  ggplot(aes(x = word, y = LD1)) +
+  geom_col()
+```
+-->
+---
+## Tree variability
+
+```{r}
+tree_1 %>% 
+  pull_workflow_fit() %$%
+  fit %>%
+  rpart.plot()
+```
+
+---
+## Tree variability
+
+```{r}
+tree_2 %>% 
+  pull_workflow_fit() %$%
+  fit %>%
+  rpart.plot()
+```
+
+---
+## Tree variability
+
+So... which should we believe?
+
+--
+
+![](https://i.imgur.com/jA2kQwE.gif)
+
+---
+
+## Tree variability
+
+Let's take several **subsamples** of the data, and make trees from each.
+
+--
+
+Then, to classify a new observation, we run it through *all* the trees and let them vote!
+
+--
+
+(It's a bit like a KNN for trees!)
+
+--
+
+This is called **bagging**
+
+---
+## Bagging
+
+```{r baguette, include = FALSE}
+library(baguette)
+
+bag_tree_spec <- bag_tree() %>%
+  set_engine("rpart", times = 5) %>%
+  set_mode("classification")
+
+```
+
+```{r, echo = FALSE}
+decorate("baguette") %>%
+  flair("times = 5")
+```
+
+---
+## Bagging
+
+```{r}
+bag_tree_wflow <- workflow() %>%
+  add_recipe(cann_recipe) %>%
+  add_model(bag_tree_spec)
+
+bag_tree_fit <- bag_tree_wflow %>%
+  fit(cann)
+
+## (this code may take a while!)
+```
+
+
+---
+## Bagging
+
+What variables were most important to the trees?
+
+```{r}
+bag_tree_fit %>% pull_workflow_fit()
+```
+
+---
+class: center, middle, inverse
+
+# Random Forests
+
+---
+
+## Random Forests
+
+What if some important variables are being masked by *more important* variables?
+
+--
+
+Remember, we have **65** predictors - yikes!
+
+--
+
+Let's give some of the other predictors a chance to shine.
+
+---
+## Random Forests
+
+Randomly choose a few of the predictors to include in the data:
+
+```{r}
+cann_reduced <- cann %>%
+  select(1,2, sample(5:65, 30))
+
+cann_reduced
+```
+
+---
+
+## Random Forests
+
+```{r, echo = FALSE}
+cann_recipe_2 <- recipe(Type ~ ., 
+                     data = cann_reduced) %>%
+  step_rm(Strain)
+
+tree_fit_reduced <- workflow() %>%
+  add_recipe(cann_recipe_2) %>%
+  add_model(tree_mod) %>%
+  fit(cann_reduced)
+
+rpart.plot(tree_fit_reduced %>% pull_workflow_fit() %$% fit)
+```
+
+---
+## Random Forests
+
+After making many random reduced trees, we then **bag** the results to end up with a **random forest**.
+
+--
+
+The advantage of this is that more unique variables are involved in the process.
+
+--
+
+This way, we don't accidentally overfit to a variable that *happens* to be extremely relevant to our particular dataset.
+
+---
+class: center, middle
+
+![](https://media1.tenor.com/images/0c023e42945dc5d1210508deb4141b77/tenor.gif?itemid=13935227)
+
+---
+class: center, middle, inverse
+
+# Your turn
+
+## Open the activity file
+
+## Find the best *bagged* model for the cannabis data
+## Find the best *random forest* model for the cannabis data
+## Report some metrics on your models
