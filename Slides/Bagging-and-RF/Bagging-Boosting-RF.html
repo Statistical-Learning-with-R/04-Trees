@@ -36,7 +36,7 @@ class: center, middle, inverse, title-slide
 class: center, middle, inverse
 
 # Measuring Success
-## Gini Index and Entropy
+## Gini Index and Cost Complexity
 
 ---
 ## Recall: Our simplest cannabis tree
@@ -45,6 +45,16 @@ class: center, middle, inverse
 * Which of the **final nodes** (or **leaves**) is **most pure**?
 
 * Which is **least pure**?
+
+--
+
+* Could we split a node further for better purity?
+
+* **almost certainly, yes!** It's highly unlikely that *all* of the unused variable have *exactly* the same prevalance across categories.
+
+--
+
+* Should we do it, or is that overfitting?
 ]
 
 .pull-right[
@@ -52,6 +62,351 @@ class: center, middle, inverse
 ![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-2-1.png)&lt;!-- --&gt;
 ]
 
+---
+## Cost Complexity revisted
+
+.pull-left[
+
+* What is the **classification error** of each leaf?
+
+--
+
+* (Left to right)
+
+    + 0.35
+    + 0.37
+    + 0.46
+    + 0.36
+    
+--
+
+* The **Gini Index** for a particular node is the average of errors in each class:
+
+`\((0.35*0.65) + (0.21*0.79) + (0.14*0.86) = 0.5138\)`
+
+    + small values if the classification errors are close to 0, i.e., high node purity
+    + large values (near 1) if the errors are high
+    + this is related to the *variance* of the node
+
+]
+
+.pull-right[
+
+```r
+rpart.plot(tree_fitted$fit)
+```
+
+```
+## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
+## To silence this warning:
+##     Call rpart.plot with roundint=FALSE,
+##     or rebuild the rpart model with model=TRUE.
+```
+
+![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-3-1.png)&lt;!-- --&gt;
+]
+
+---
+
+## Gini Index
+
+To calculate the Gini Index average across all leaves:
+
+
+```r
+cann %&gt;%
+  bind_cols(
+    predict(tree_fitted, cann, type = "prob")
+  ) %&gt;%
+  gain_capture(truth = Type,
+               .pred_hybrid, .pred_indica, .pred_sativa)
+```
+
+```
+## # A tibble: 1 x 3
+##   .metric      .estimator .estimate
+##   &lt;chr&gt;        &lt;chr&gt;          &lt;dbl&gt;
+## 1 gain_capture macro          0.482
+```
+
+---
+
+## Cost Complexity revisited
+
+So, when should we split the tree further?
+
+--
+
+Only if the new splits improve the Gini Index by a certain amount.
+
+--
+
+This is the `cost_complexity` parameter!
+
+-- 
+
+But wait!  This is a **penalized** metric, using an arbitrary penalty `\(\alpha\)` to avoid overfitting.
+
+Don't we like cross-validation better?
+
+--
+
+Well... yes.
+
+But imagine fitting *every possible tree* and cross-validating.... yikes.
+
+We have to limit our options and cut our losses somehow!
+
+---
+class: center, middle, inverse
+
+# Bagging
+
+---
+## Tree variability
+
+Suppose I took two random subsamples of my cannabis dataset:
+
+
+```r
+set.seed(9374534)
+splits &lt;- cann %&gt;% 
+  initial_split(0.5, strata = Type)
+
+cann_1 &lt;- splits %&gt;% training()
+cann_2 &lt;- splits %&gt;% testing()
+
+dim(cann_1)
+```
+
+```
+## [1] 1154   69
+```
+
+```r
+dim(cann_2)
+```
+
+```
+## [1] 1151   69
+```
+
+---
+## Tree variability
+
+Then I fit a **decision tree** to each:
+
+
+```r
+tree_1 &lt;- tree_wflow %&gt;%
+  fit(cann_1)
+
+tree_2 &lt;- tree_wflow %&gt;%
+  fit(cann_2)
+```
+
+How similar will the results be?
+
+---
+## Tree variability
+
+
+```r
+tree_1 %&gt;% 
+  pull_workflow_fit() %$%
+  fit %&gt;%
+  rpart.plot()
+```
+
+```
+## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
+## To silence this warning:
+##     Call rpart.plot with roundint=FALSE,
+##     or rebuild the rpart model with model=TRUE.
+```
+
+![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-7-1.png)&lt;!-- --&gt;
+
+---
+## Tree variability
+
+
+```r
+tree_2 %&gt;% 
+  pull_workflow_fit() %$%
+  fit %&gt;%
+  rpart.plot()
+```
+
+```
+## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
+## To silence this warning:
+##     Call rpart.plot with roundint=FALSE,
+##     or rebuild the rpart model with model=TRUE.
+```
+
+![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
+
+---
+## Tree variability
+
+So... which should we believe?
+
+--
+
+![](https://i.imgur.com/jA2kQwE.gif)
+
+---
+
+## Tree variability
+
+Let's take several **subsamples** of the data, and make trees from each.
+
+--
+
+Then, to classify a new observation, we run it through *all* the trees and let them vote!
+
+--
+
+(It's a bit like a KNN for trees!)
+
+--
+
+This is called **bagging**
+
+---
+## Bagging
+
+
+
+
+&lt;code class ='r hljs remark-code'&gt;library(baguette)&lt;br&gt;&lt;br&gt;bag_tree_spec &lt;- bag_tree() %&gt;%&lt;br&gt;&amp;nbsp;&amp;nbsp;set_engine("rpart", &lt;span style="background-color:#ffff7f"&gt;times = 3&lt;/span&gt;) %&gt;%&lt;br&gt;&amp;nbsp;&amp;nbsp;set_mode("classification")&lt;/code&gt;
+
+---
+## Bagging
+
+
+```r
+bag_tree_wflow &lt;- workflow() %&gt;%
+  add_recipe(cann_recipe) %&gt;%
+  add_model(bag_tree_spec)
+
+bag_tree_fit &lt;- bag_tree_wflow %&gt;%
+  fit(cann)
+
+## (this code may take a while!)
+```
+
+
+---
+## Bagging
+
+What variables were most important to the trees?
+
+
+```r
+bag_tree_fit %&gt;% pull_workflow_fit()
+```
+
+---
+class: center, middle, inverse
+
+# Random Forests
+
+---
+
+## Random Forests
+
+What if some important variables are being masked by *more important* variables?
+
+--
+
+Remember, we have **65** predictors - yikes!
+
+--
+
+Let's give some of the other predictors a chance to shine.
+
+---
+## Random Forests
+
+Randomly choose a few of the predictors to include in the data:
+
+
+```r
+cann_reduced &lt;- cann %&gt;%
+  select(1,2, sample(5:65, 30))
+
+cann_reduced
+```
+
+```
+## # A tibble: 2,305 x 32
+##    Strain   Type  Tobacco   Dry Honey Ammonia Giggly Apple Relaxed Flowery Grape
+##    &lt;chr&gt;    &lt;fct&gt;   &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt; &lt;dbl&gt;
+##  1 100-Og   hybr~       0     0     0       0      0     0       1       0     0
+##  2 98-Whit~ hybr~       0     0     0       0      0     0       1       1     0
+##  3 1024     sati~       0     0     0       0      0     0       1       0     0
+##  4 13-Dawgs hybr~       0     0     0       0      0     0       1       0     1
+##  5 24K-Gold hybr~       0     0     0       0      0     0       1       0     0
+##  6 3-Bears~ indi~       0     0     0       0      0     0       0       0     0
+##  7 3-Kings  hybr~       0     0     0       0      0     0       1       0     0
+##  8 303-Og   indi~       0     0     0       0      1     0       1       0     0
+##  9 3D-Cbd   sati~       0     0     0       0      0     0       1       1     0
+## 10 3X-Crazy indi~       0     0     0       0      0     0       1       0     1
+## # ... with 2,295 more rows, and 21 more variables: Tea &lt;dbl&gt;, Blueberry &lt;dbl&gt;,
+## #   Creative &lt;dbl&gt;, Menthol &lt;dbl&gt;, Tropical &lt;dbl&gt;, Woody &lt;dbl&gt;, Earthy &lt;dbl&gt;,
+## #   Skunk &lt;dbl&gt;, Citrus &lt;dbl&gt;, Mouth &lt;dbl&gt;, Berry &lt;dbl&gt;, Pungent &lt;dbl&gt;,
+## #   Chestnut &lt;dbl&gt;, Blue &lt;dbl&gt;, Happy &lt;dbl&gt;, Vanilla &lt;dbl&gt;, Focused &lt;dbl&gt;,
+## #   Lavender &lt;dbl&gt;, Talkative &lt;dbl&gt;, Grapefruit &lt;dbl&gt;, Fruit &lt;dbl&gt;
+```
+
+---
+
+## Random Forests
+
+
+```
+## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
+## To silence this warning:
+##     Call rpart.plot with roundint=FALSE,
+##     or rebuild the rpart model with model=TRUE.
+```
+
+![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-13-1.png)&lt;!-- --&gt;
+
+---
+## Random Forests
+
+After making many random reduced trees, we then **bag** the results to end up with a **random forest**.
+
+--
+
+The advantage of this is that more unique variables are involved in the process.
+
+--
+
+This way, we don't accidentally overfit to a variable that *happens* to be extremely relevant to our particular dataset.
+
+--
+
+Model spec: `rand_forest()`
+
+---
+class: center, middle
+
+![](https://media1.tenor.com/images/0c023e42945dc5d1210508deb4141b77/tenor.gif?itemid=13935227)
+
+---
+class: center, middle, inverse
+
+# Your turn
+
+## Open the activity file
+
+## Find the best *bagged* model for the cannabis data
+## Find the best *random forest* model for the cannabis data
+## Report some metrics on your models
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>

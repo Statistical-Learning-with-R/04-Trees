@@ -24,6 +24,7 @@ library(glmnet)
 library(here)
 library(rpart.plot)
 library(discrim)
+library(magrittr)
 
 set.seed(98249)
 ```
@@ -312,7 +313,7 @@ decorate("baguette") %>%
 ---
 ## Bagging
 
-```{r}
+```{r, eval = FALSE}
 bag_tree_wflow <- workflow() %>%
   add_recipe(cann_recipe) %>%
   add_model(bag_tree_spec)
@@ -329,7 +330,7 @@ bag_tree_fit <- bag_tree_wflow %>%
 
 What variables were most important to the trees?
 
-```{r}
+```{r, eval = FALSE}
 bag_tree_fit %>% pull_workflow_fit()
 ```
 
