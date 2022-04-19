@@ -1,16 +1,26 @@
 ---
-title: "Classification 2"
+title: "Classification: Decision Trees"
 author: "YOUR NAME HERE"
-output: html_document
+format: 
+  html:
+    code-fold: true
+    code-line-numbers: true
+    code-tools: true
+    self-contained: true
+editor: visual
+execute:
+  message: false
 ---
 
-```{r, include = FALSE}
-templar::versions_multilingual()
-```
-```{r setup, include=FALSE}
+## Setup
+
+Declare your libraries:
+
+```{r}
+#| label: libraries-r
+#| include: false
 library(tidyverse)
 library(tidymodels)
-library(kknn)
 library(glmnet)
 library(discrim)
 library(rpart)
@@ -22,10 +32,9 @@ library(rpart.plot)
 
 Today's data concerns strains of cannabis, which have the types of `sativa`, `indica`, or `hybrid`:
 
-```{r, echo = FALSE, message = FALSE}
+```{r}
 
 cann <- read_csv("https://www.dropbox.com/s/s2a1uoiegitupjc/cannabis_full.csv?dl=1")
-
 
 cann <- cann %>%
   mutate(
@@ -40,9 +49,12 @@ cann_recipe <- recipe(Type ~ .,
   step_rm(Strain, Effects, Flavor)
 ```
 
+
 ## Logistic Regression
 
-```{r, error = TRUE}
+Does not work:
+
+```{r}
 logit_mod <- logistic_reg() %>%
   set_engine("glm") %>%
   set_mode("classification")
@@ -59,7 +71,9 @@ logit_fit <- logit_wflow %>%
 
 ## Discriminant Analysis
 
-```{r, error = TRUE}
+Does work:
+
+```{r}
 lda_mod <- discrim_linear() %>%
   set_engine("MASS") %>%
   set_mode("classification")
@@ -76,7 +90,9 @@ lda_fit <- lda_wflow %>%
 
 ## KNN
 
-```{r, error = TRUE}
+Does work:
+
+```{r}
 knn_mod <- nearest_neighbor(neighbors = 5) %>%
   set_engine("kknn") %>%
   set_mode("classification")
@@ -90,31 +106,31 @@ knn_fit <- knn_wflow %>%
 
 ```
 
+
+
 ```{r}
 knn_fit <- knn_wflow %>%
   fit_resamples(cann_cvs,
                 metrics = metric_set(accuracy, roc_auc, precision, recall))
-
 
 knn_fit %>% collect_metrics()
 ```
 
 ## Decision Trees
 
-```{r, echo = FALSE}
+```{r}
 cann %>%
   ggplot(aes(x = factor(Energetic), fill = factor(Type))) +
   geom_bar(position = "fill")
 ```
 
-```{r, echo = FALSE}
+```{r}
 cann %>%
   ggplot(aes(x = factor(Pineapple), fill = Type)) +
   geom_bar(position = "fill")
 ```
 
-
-```{r, error = TRUE}
+```{r}
 tree_mod <- decision_tree() %>%
   set_engine("rpart") %>%
   set_mode("classification")
@@ -124,18 +140,16 @@ tree_wflow <- workflow() %>%
   add_model(tree_mod)
 ```
 
-
 ```{r}
 tree_fit <- tree_wflow %>%
   fit_resamples(cann_cvs,
                 metrics = metric_set(accuracy, roc_auc, precision, recall))
 
-
 tree_fit %>% collect_metrics()
 ```
 
 
-```{r, echo = FALSE}
+```{r}
 
 tree_fit_1 <- tree_wflow %>%
   fit(cann)
@@ -145,20 +159,21 @@ tree_fit_1$fit
 
 #### Plot of Tree
 
-```{r, echo = FALSE, warning = FALSE}
+```{r}
 tree_fitted <- tree_fit_1 %>% 
   pull_workflow_fit()
 
 rpart.plot(tree_fitted$fit)
 ```
+
+
 #### Tuning
 
-```{r, cache = TRUE}
+```{r}
 tree_grid <- grid_regular(cost_complexity(),
                           tree_depth(),
                           min_n(), 
                           levels = 2)
-
 
 tree_mod <- decision_tree(cost_complexity = tune(),
                           tree_depth = tune(),
@@ -180,7 +195,6 @@ tree_grid_search <-
 tuning_metrics <- tree_grid_search %>% collect_metrics()
 ```
 
-
 ```{r}
 tuning_metrics %>%
   filter(.metric == "accuracy") %>%
@@ -200,5 +214,4 @@ tuning_metrics %>%
 #### Report some metrics for the final model
 #### Plot the tree (code is provided)
 #### Interpret the first two levels of splits in plain English.
-
 

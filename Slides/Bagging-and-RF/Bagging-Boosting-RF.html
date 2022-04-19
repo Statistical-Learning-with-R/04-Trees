@@ -96,13 +96,6 @@ class: center, middle, inverse
 rpart.plot(tree_fitted$fit)
 ```
 
-```
-## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
-## To silence this warning:
-##     Call rpart.plot with roundint=FALSE,
-##     or rebuild the rpart model with model=TRUE.
-```
-
 ![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-3-1.png)&lt;!-- --&gt;
 ]
 
@@ -218,13 +211,6 @@ tree_1 %&gt;%
   rpart.plot()
 ```
 
-```
-## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
-## To silence this warning:
-##     Call rpart.plot with roundint=FALSE,
-##     or rebuild the rpart model with model=TRUE.
-```
-
 ![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-7-1.png)&lt;!-- --&gt;
 
 ---
@@ -236,13 +222,6 @@ tree_2 %&gt;%
   pull_workflow_fit() %$%
   fit %&gt;%
   rpart.plot()
-```
-
-```
-## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
-## To silence this warning:
-##     Call rpart.plot with roundint=FALSE,
-##     or rebuild the rpart model with model=TRUE.
 ```
 
 ![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-8-1.png)&lt;!-- --&gt;
@@ -280,7 +259,7 @@ This is called **bagging**
 
 
 
-&lt;code class ='r hljs remark-code'&gt;library(baguette)&lt;br&gt;&lt;br&gt;bag_tree_spec &lt;- bag_tree() %&gt;%&lt;br&gt;&amp;nbsp;&amp;nbsp;set_engine("rpart", &lt;span style="background-color:#ffff7f"&gt;times = 3&lt;/span&gt;) %&gt;%&lt;br&gt;&amp;nbsp;&amp;nbsp;set_mode("classification")&lt;/code&gt;
+&lt;code class ='r hljs remark-code'&gt;library(baguette)&lt;br&gt;&lt;br&gt;bag_tree_spec &lt;- bag_tree() %&gt;%&lt;br&gt;&amp;nbsp;&amp;nbsp;set_engine("rpart", &lt;span style="background-color:#ffff7f"&gt;times = 5&lt;/span&gt;) %&gt;%&lt;br&gt;&amp;nbsp;&amp;nbsp;set_mode("classification")&lt;/code&gt;
 
 ---
 ## Bagging
@@ -364,14 +343,6 @@ cann_reduced
 ---
 
 ## Random Forests
-
-
-```
-## Warning: Cannot retrieve the data used to build the model (so cannot determine roundint and is.binary for the variables).
-## To silence this warning:
-##     Call rpart.plot with roundint=FALSE,
-##     or rebuild the rpart model with model=TRUE.
-```
 
 ![](Bagging-Boosting-RF_files/figure-html/unnamed-chunk-13-1.png)&lt;!-- --&gt;
 

@@ -1,0 +1,199 @@
+---
+title: "Classification: Decision Trees"
+author: "YOUR NAME HERE"
+format: 
+  html:
+    code-fold: true
+    code-line-numbers: true
+    code-tools: true
+    self-contained: true
+editor: visual
+execute:
+  message: false
+jupyter: python3
+---
+
+## Setup
+
+Declare your libraries:
+
+
+```{python}
+#| label: libraries-py
+#| include: false
+import pandas as pd
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+
+from sklearn.metrics import r2_score, confusion_matrix, accuracy_score, precision_score, recall_score, roc_auc_score, make_scorer
+
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
+from sklearn.compose import make_column_transformer
+from sklearn.pipeline import Pipeline, make_pipeline
+
+from sklearn.model_selection import cross_val_score, GridSearchCV, KFold
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+```
+
+# Setup
+
+Today's data concerns strains of cannabis, which have the types of `sativa`, `indica`, or `hybrid`:
+
+
+```{python}
+
+cann = pd.read_csv("https://www.dropbox.com/s/s2a1uoiegitupjc/cannabis_full.csv?dl=1")
+
+cann["Type"] = cann["Type"].astype("category")
+cann = cann.dropna() 
+
+cann = cann.drop(columns = ["Strain", "Effects", "Flavor"])
+
+cann_X = cann.drop(columns = ["Type"])
+
+cross_validation = KFold(n_splits=10)
+
+```
+
+## Logistic Regression
+
+Does not work:
+
+
+```{python}
+logit_wflow = make_pipeline(
+  LogisticRegression()
+)
+
+logit_scores = cross_val_score(logit_wflow, cann_X, cann["Type"], scoring="accuracy", cv=cross_validation)
+
+```
+
+## Discriminant Analysis
+
+Does work:
+
+
+```{python}
+lda_wflow = make_pipeline(
+  LinearDiscriminantAnalysis()
+)
+
+lda_scores = cross_val_score(lda_wflow, cann_X, cann["Type"], scoring="accuracy", cv=cross_validation)
+
+lda_scores
+
+```
+
+## KNN
+
+Does work:
+
+
+```{python}
+
+knn_wflow = make_pipeline(
+  KNeighborsClassifier(n_neighbors = 5)
+)
+
+knn_scores = cross_val_score(knn_wflow, cann_X, cann["Type"], scoring="accuracy", cv=cross_validation)
+
+knn_scores
+
+```
+
+```{python}
+
+knn_scores = cross_val_score(knn_wflow, cann_X, cann["Type"], scoring="precision_macro", cv=cross_validation)
+
+knn_scores
+
+knn_scores = cross_val_score(knn_wflow, cann_X, cann["Type"], scoring="recall_macro", cv=cross_validation)
+
+knn_scores
+
+knn_scores = cross_val_score(knn_wflow, cann_X, cann["Type"], scoring="roc_auc_ovr", cv=cross_validation)
+
+knn_scores
+
+```
+
+
+## Decision Trees
+
+
+
+
+
+```{python}
+tree_wflow = make_pipeline(
+  DecisionTreeClassifier()
+)
+
+tree_acc = cross_val_score(tree_wflow, cann_X, cann["Type"], scoring="accuracy", cv=cross_validation)
+
+tree_prec = cross_val_score(tree_wflow, cann_X, cann["Type"], scoring="precision_macro", cv=cross_validation)
+
+tree_rec = cross_val_score(tree_wflow, cann_X, cann["Type"], scoring="recall_macro", cv=cross_validation)
+
+tree_roc = cross_val_score(tree_wflow, cann_X, cann["Type"], scoring="roc_auc_ovr", cv=cross_validation)
+
+tree_acc.mean()
+tree_prec.mean()
+tree_rec.mean()
+tree_roc.mean()
+```
+
+
+#### Plot of Tree
+
+
+```{python}
+
+tree = DecisionTreeClassifier()
+
+tree.fit(cann_X, cann["Type"])
+
+plot_tree(tree)
+
+```
+
+#### Tuning
+
+
+
+
+```{python}
+
+tree_grid = [
+  {"decisiontreeclassifier__ccp_alpha": [0.1, 0.0000001]}, 
+  {"decisiontreeclassifier__max_depth": [1, 15]},
+  {"decisiontreeclassifier__min_samples_split": [2, 40]}
+  ]
+
+grid_search = GridSearchCV(tree_wflow,
+                           param_grid=tree_grid,
+                           scoring=scoring,
+                           cv=10)
+                           
+grid_search.fit(cann_X, cann["Type"])
+
+grid_search.best_estimator_
+
+```
+
+## Your Turn
+
+#### Fit a final model with the selected hyperparameters
+#### Report some metrics for the final model
+#### Plot the tree (code is provided)
+#### Interpret the first two levels of splits in plain English.
+

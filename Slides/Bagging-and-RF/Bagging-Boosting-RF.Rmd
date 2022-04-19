@@ -16,6 +16,8 @@ output:
 
 ```{r setup, include=FALSE}
 
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = TRUE, echo = TRUE)
+
 library(tidyverse)
 library(tidymodels)
 library(flair)
@@ -300,14 +302,14 @@ This is called **bagging**
 library(baguette)
 
 bag_tree_spec <- bag_tree() %>%
-  set_engine("rpart", times = 3) %>%
+  set_engine("rpart", times = 5) %>%
   set_mode("classification")
 
 ```
 
 ```{r, echo = FALSE}
 decorate("baguette") %>%
-  flair("times = 3")
+  flair("times = 5")
 ```
 
 ---

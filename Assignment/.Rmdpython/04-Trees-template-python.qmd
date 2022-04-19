@@ -1,0 +1,131 @@
+---
+title: "Lab: Decision Trees"
+author: "YOUR NAME HERE"
+format: 
+  html:
+    code-fold: true
+    code-line-numbers: true
+    code-tools: true
+    self-contained: true
+editor: visual
+execute:
+  message: false
+jupyter: python3
+---
+
+## Setup
+
+Declare your libraries:
+
+
+```{python}
+#| label: libraries-py
+#| include: false
+import pandas as pd
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+
+from sklearn.metrics import r2_score, confusion_matrix, accuracy_score, precision_score, recall_score, roc_auc_score, make_scorer
+
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, LabelEncoder
+from sklearn.compose import make_column_transformer
+from sklearn.pipeline import Pipeline, make_pipeline
+
+from sklearn.model_selection import cross_val_score, GridSearchCV, KFold
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+
+from sklearn.tree import DecisionTreeClassifier, plot_tree, RandomForestClassifier
+
+from sklearn.ensemble import BaggingClassifier
+```
+
+# Dataset 1:  Mushrooms
+
+The first dataset we will study today concerns mushrooms that grow in the wild.
+An expert mushroom forager can identify the species by its appearance, and determine
+if the mushroom is edible or poisonous.  
+
+Can we train a model to do the same?
+
+Read the data in as follows.  (You do need the extra bit of code in the `read_csv` function, make sure you copy it over.)
+
+
+```{python}
+mushrooms = pd.read_csv("https://www.dropbox.com/s/jk5q3dq1u63ey1e/mushrooms.csv?dl=1") 
+
+mushrooms = mushrooms.astype("category")
+
+mushrooms = mushrooms.drop(columns = "veil-type")
+```
+
+You can find further documentation of the dataset here: https://www.kaggle.com/uciml/mushroom-classification
+
+## Part One: A perfect tree
+
+Fit a single decision tree to the full mushroom data, and plot the resulting tree.
+
+You should find that almost all mushrooms are perfectly classified; that is, the resulting leaf nodes are very close to 100% pure.
+
+Based on the tree that results, suggest a "nature guide" that tells people which mushrooms are safe to eat and which aren't.
+
+## Part Two: ... or is it?
+
+Before we send people off into the world to each poisonous mushrooms, we want to be confident of our guidelines.  The decision tree in Q1 may achieve perfection on the data it is fit to, but do we believe these guidelines will hold for future data?
+
+Apply each of the following resampling and/or ensemble techniques to this classification problem.  For each, make an argument from the results.
+
+You should either argue that 
+
+(a) The classification rules we learned in Part One probably apply to all mushrooms; or
+
+(b) The classification rules we learned in Part One are overfit to this particular sample of mushrooms and/or set off predictors.
+
+#### Q1: Cross-validation
+
+#### Q2: Bagging
+
+#### Q3: Random forests
+
+## Part Three:  Logistic Regression
+
+# Dataset 2:  Telecom Customers
+
+Congratulations!  You have been hired by the Data Science division of a major telecommunication company.
+
+The Sales division of the company wants to understand how customer demographics - such as their age, income, marital status, employment status, etc - impact the customer's behavior.  They have identified four different types of customers, and labeled a dataset of existing customers with these categories.
+
+
+```{python}
+tele = pd.read_csv("https://www.dropbox.com/s/9dymy30v394ud8h/Telecust1.csv?dl=1")
+```
+
+Further documentation of this data can be found here: 
+https://www.kaggle.com/prathamtripathi/customersegmentation
+
+You've been tasked with studying the customer demographics and customer categories.  The company would like two results from you:
+
+1. A model that can be used to predict what category a new customer who signs up will likely fall into.
+
+2. Insight into what demographics are associated with these customer differences.
+
+#### Part Four:  Report to your manager
+
+Your manager, the head of the Data Science department, would like a summary of your work.  
+
+She does not need to see every single detail of every step of your process, but she does need to know a basic outline of what you tried, how you made your decisions, and why you settled on certain choices.
+
+You should share only as much of your code and results as you feel is necessary for her to get the "big picture" of your approach.  You can assume she has taken Stat 434, and you may use any "lingo" you want; for example, you can reference the Gini Index without having to explain what it is.
+
+#### Part Five: Report to Sales
+
+Now that your manager has approved your work, you're ready to present the results to Sales.
+
+The Sales team has zero Data Science training.  They have some understanding of things like percentages, means, and medians - but they do not know or care about modeling details.
+
+Summarize the results of your work in a way that is understandable to the Sales team, and only contains the level of technical detail that they might need to properly use the results in their job.  You should NOT use any lingo.  For example, instead of saying "We chose the model with highest precision", you should say, "We chose the model that was least likely to misclassify an A-type customer as B-type."
