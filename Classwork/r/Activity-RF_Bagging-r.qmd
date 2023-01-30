@@ -28,7 +28,6 @@ library(rpart.plot)
 library(baguette)
 ```
 
-
 # Setup
 
 ```{r}
@@ -67,8 +66,6 @@ tree_fitted <- tree_fit_1 %>%
 rpart.plot(tree_fitted$fit)
 ```
 
-
-
 ## Bagging
 
 ```{r}
@@ -79,18 +76,21 @@ bag_tree_spec <- bag_tree() %>%
 
 ```
 
-
 ## Random Forests
 
 ```{r}
-rf_spec <- random_forest() %>%
-  set_engine("ranger", times = 5) %>%
+rf_spec <- rand_forest(mtry = tune(), min_n = tune(), trees = 10) %>%
+  set_engine("ranger") %>%
   set_mode("classification")
-```
 
+rf_grid <- grid_regular(mtry(c(?????)),#decide the smallest and largest values you are willing to consider for how many random parameters to choose
+                        ?????)  
+```
 
 # Your turn
 
 ## Find the best *bagged* model for the cannabis data
+
 ## Find the best *random forest* model for the cannabis data
+
 ## Report some metrics on your models
